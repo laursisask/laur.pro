@@ -1,0 +1,15 @@
+{{ define "main" }}
+  {{ range where .Site.RegularPages.ByPublishDate.Reverse "Type" "posts" }}
+    <div class="article-item">
+      <img
+        class="article-illustration"
+        src="{{ (.Resources.GetMatch "illustration.png").RelPermalink }}"
+        alt="" />
+      <div class="article-details">
+        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+        <span>{{ .Summary }}</span>
+        <span>{{ .PublishDate.Format "January 2, 2006" }}</span>
+      </div>
+    </div>
+  {{ end }}
+{{ end }}

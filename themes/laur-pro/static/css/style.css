@@ -1,0 +1,78 @@
+body {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Charter, Georgia, serif;
+  font-size: 16px;
+}
+
+/* Typography */
+
+a {
+  color: #de6b48;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #f4b9b2;
+}
+
+h1 {
+  font-size: 30px;
+}
+
+h2 {
+  font-size: 24px;
+}
+
+/* Overall layout */
+
+.container {
+  width: 80%;
+  max-width: 1000px;
+  margin: auto;
+}
+
+/* Article list */
+
+.article-item {
+  display: flex;
+  height: 64px;
+  padding: 16px 0;
+  border-bottom: 1px solid #a8a8a8;
+}
+
+.article-item a {
+  font-size: 18px;
+  padding-bottom: 4px;
+}
+
+.article-item span {
+  display: flex;
+  flex-direction: column;
+}
+
+.article-illustration {
+  border-radius: 64px;
+  margin-right: 16px;
+}
+
+.article-details {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Single article */
+
+.article-title {
+  margin-bottom: 4px;
+}
+
+.publish-date {
+  color: #a8a8a8;
+}
+
+@font-face {
+  font-family: "Charter";
+  src: url("../fonts/Charter-Regular.woff2") format("woff2");
+}

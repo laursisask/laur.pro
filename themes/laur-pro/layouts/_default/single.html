@@ -1,0 +1,5 @@
+{{ define "main" }}
+  <h2 class="article-title">{{ .Title }}</h2>
+  <span class="publish-date">{{ .PublishDate.Format "January 2, 2006" }}</span>
+  {{ .Content }}
+{{ end }}
