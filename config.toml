@@ -1,3 +1,5 @@
-baseURL = 'http://example.org/'
+baseURL = 'https://laur.pro'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = 'laur.pro'
+theme = 'laur-pro'
+disableKinds = ['taxonomy', 'term']
