@@ -2,7 +2,7 @@
 title: "Solving Google CTF 2022 OCR challenge"
 date: 2022-07-22T18:02:08+03:00
 publishDate: 2022-07-22T18:02:08+03:00
-draft: false
+draft: true
 summary: '"Training" a tiny MLP to recognize handwritten digits'
 ---
 
