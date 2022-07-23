@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "format": "prettier --write '{themes,content}/**/*.{html,css,js,md}'"
+    "format": "prettier --write '{themes,content,.github}/**/*.{html,css,js,md,yml}'"
   },
   "author": "",
   "license": "ISC",
