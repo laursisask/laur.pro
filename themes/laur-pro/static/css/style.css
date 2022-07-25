@@ -37,7 +37,6 @@ h2 {
 
 .article-item {
   display: flex;
-  height: 64px;
   padding: 16px 0;
   border-bottom: 1px solid #a8a8a8;
 }
@@ -55,6 +54,7 @@ h2 {
 .article-illustration {
   border-radius: 64px;
   margin-right: 16px;
+  height: 64px;
 }
 
 .article-details {
