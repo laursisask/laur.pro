@@ -27,8 +27,34 @@ h2 {
   font-size: 24px;
 }
 
+p {
+  text-align: justify;
+  text-justify: inter-word;
+  line-height: 22px;
+}
+
 code {
   font-size: 14px;
+}
+
+/* Tables */
+
+table {
+  border-collapse: collapse;
+}
+
+table th,
+table td {
+  border: 1px solid;
+  padding: 5px;
+}
+
+/* Images */
+
+.figure {
+  display: block;
+  margin: auto;
+  max-width: 100%;
 }
 
 /* Overall layout */

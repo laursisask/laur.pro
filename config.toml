@@ -3,7 +3,12 @@ languageCode = 'en-us'
 title = 'laur.pro'
 theme = 'laur-pro'
 disableKinds = ['taxonomy', 'term']
+ignoreFiles = ['\.ai$']
 
 [markup]
   [markup.highlight]
     noClasses = false
+
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
