@@ -3,3 +3,7 @@ languageCode = 'en-us'
 title = 'laur.pro'
 theme = 'laur-pro'
 disableKinds = ['taxonomy', 'term']
+
+[markup]
+  [markup.highlight]
+    noClasses = false

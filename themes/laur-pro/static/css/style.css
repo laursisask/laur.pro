@@ -1,3 +1,5 @@
+@import "syntax.css";
+
 body {
   width: 100%;
   margin: 0;
@@ -23,6 +25,10 @@ h1 {
 
 h2 {
   font-size: 24px;
+}
+
+code {
+  font-size: 14px;
 }
 
 /* Overall layout */
