@@ -1,3 +1,10 @@
+.highlight {
+  background-color: #f1f3f4;
+  border-radius: 8px;
+  font-size: 14px;
+  overflow-y: auto;
+}
+
 /* Background */
 .bg {
   background-color: #f8f8f8;
@@ -5,8 +12,8 @@
 /* PreWrapper */
 .chroma {
   background-color: #f1f3f4;
-  border-radius: 5px;
-  padding: 5px;
+  padding: 8px;
+  margin: 0;
 }
 /* Other */
 .chroma .x {
