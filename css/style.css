@@ -53,6 +53,12 @@ table td {
   max-width: 100%;
 }
 
+/* Equations */
+
+.MathJax {
+  overflow-x: auto;
+}
+
 /* Overall layout */
 
 .container {
