@@ -1,0 +1,331 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><link rel=stylesheet type=text/css href=/css/style.css><script>window.MathJax={options:{enableMenu:!1},loader:{load:["[tex]/ams"]},tex:{packages:{"[+]":["ams"]}}}</script><script id=MathJax-script async src=/mathjax/tex-mml-chtml.js></script><title>Solving Google CTF 2022 OCR challenge</title></head><body><div class=container><div><h1><a href=/>laur.pro</a></h1></div><div><h2 class=article-title>Solving Google CTF 2022 OCR challenge</h2><span class=publish-date>July 25, 2022</span><p>The 2022 Google CTF featured a task in which contestants were asked to train an
+artificial neural network that can classify images containing handwritten
+characters. While optical character recognition is generally considered a
+“solved” problem, this specific task had additional constraints that made it
+more challenging to tackle.</p><p>In this post, I will present my solution to the task at hand.</p><h3 id=the-problem>The Problem</h3><p>The goal was to train a 2-layer MLP that takes in a 16x16x3 RGB image and
+outputs a probability distribution over ASCII symbols (128 in total), indicating
+the model’s confidence in which symbol is depicted in the image. The hidden
+layer in the network has a size of 4 and is followed by the ReLU activation
+function. The probability distribution is computed with softmax function.</p><p>In PyTorch, you could write this model as follows:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-py data-lang=py><span class=line><span class=cl><span class=kn>import</span> <span class=nn>torch</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>torch.nn.functional</span> <span class=k>as</span> <span class=nn>F</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>class</span> <span class=nc>Model</span><span class=p>(</span><span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Module</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>  <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>    <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=bp>self</span><span class=o>.</span><span class=n>linear1</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Linear</span><span class=p>(</span><span class=mi>16</span> <span class=o>*</span> <span class=mi>16</span> <span class=o>*</span> <span class=mi>3</span><span class=p>,</span> <span class=mi>4</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=bp>self</span><span class=o>.</span><span class=n>linear2</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Linear</span><span class=p>(</span><span class=mi>4</span><span class=p>,</span> <span class=mi>128</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>def</span> <span class=nf>forward</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>x</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>x</span> <span class=o>/</span> <span class=mi>255</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>flatten</span><span class=p>(</span><span class=n>x</span><span class=p>,</span> <span class=n>start_dim</span><span class=o>=</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>linear1</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>F</span><span class=o>.</span><span class=n>relu</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>linear2</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>F</span><span class=o>.</span><span class=n>softmax</span><span class=p>(</span><span class=n>x</span><span class=p>,</span> <span class=n>dim</span><span class=o>=-</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>x</span>
+</span></span></code></pre></div><p>Four images containing the symbols C, T, F, and { were given as training
+examples:</p><p><img src=00.png alt=C> <img src=01.png alt=T> <img src=02.png alt=F> <img src=03.png alt={></p><p>After training the neural network, you evaluate it on a remote server. Upon
+connecting to the server, you first send your parameters for the network. After
+the parameters have been set, you can prompt the server to use the network to
+classify symbols on a sequence of 34 images stored on the server.</p><p>These 34 images contain the flag for the challenge. The server runs each image
+through the network and responds with the character in which the neural network
+was most confident for every image. Additionally, if all the predictions were
+correct, the server lets you know that you have successfully decoded the flag
+and can submit it on the Google CTF website.</p><p>For those interested, I have included the code for the remote server in the
+following spoiler.</p><details><summary>Server code</summary><div class=highlight><pre tabindex=0 class=chroma><code class=language-py data-lang=py><span class=line><span class=cl><span class=c1># Copyright 2022 Google LLC</span>
+</span></span><span class=line><span class=cl><span class=c1>#</span>
+</span></span><span class=line><span class=cl><span class=c1># Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);</span>
+</span></span><span class=line><span class=cl><span class=c1># you may not use this file except in compliance with the License.</span>
+</span></span><span class=line><span class=cl><span class=c1># You may obtain a copy of the License at</span>
+</span></span><span class=line><span class=cl><span class=c1>#</span>
+</span></span><span class=line><span class=cl><span class=c1>#     https://www.apache.org/licenses/LICENSE-2.0</span>
+</span></span><span class=line><span class=cl><span class=c1>#</span>
+</span></span><span class=line><span class=cl><span class=c1># Unless required by applicable law or agreed to in writing, software</span>
+</span></span><span class=line><span class=cl><span class=c1># distributed under the License is distributed on an &#34;AS IS&#34; BASIS,</span>
+</span></span><span class=line><span class=cl><span class=c1># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+</span></span><span class=line><span class=cl><span class=c1># See the License for the specific language governing permissions and</span>
+</span></span><span class=line><span class=cl><span class=c1># limitations under the License.</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>numpy</span> <span class=k>as</span> <span class=nn>np</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>sys</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>glob</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>string</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>tensorflow</span> <span class=k>as</span> <span class=nn>tf</span>
+</span></span><span class=line><span class=cl><span class=kn>from</span> <span class=nn>keras.models</span> <span class=kn>import</span> <span class=n>Sequential</span>
+</span></span><span class=line><span class=cl><span class=kn>from</span> <span class=nn>keras.layers.core</span> <span class=kn>import</span> <span class=n>Dense</span><span class=p>,</span> <span class=n>Flatten</span>
+</span></span><span class=line><span class=cl><span class=kn>from</span> <span class=nn>flag</span> <span class=kn>import</span> <span class=n>flag</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>signal</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>signal</span><span class=o>.</span><span class=n>alarm</span><span class=p>(</span><span class=mi>120</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>tf</span><span class=o>.</span><span class=n>compat</span><span class=o>.</span><span class=n>v1</span><span class=o>.</span><span class=n>disable_eager_execution</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>image_data</span> <span class=o>=</span> <span class=p>[]</span>
+</span></span><span class=line><span class=cl><span class=k>for</span> <span class=n>f</span> <span class=ow>in</span> <span class=nb>sorted</span><span class=p>(</span><span class=n>glob</span><span class=o>.</span><span class=n>glob</span><span class=p>(</span><span class=s2>&#34;images/*.png&#34;</span><span class=p>)):</span>
+</span></span><span class=line><span class=cl>    <span class=n>im</span> <span class=o>=</span> <span class=n>tf</span><span class=o>.</span><span class=n>keras</span><span class=o>.</span><span class=n>preprocessing</span><span class=o>.</span><span class=n>image</span><span class=o>.</span><span class=n>load_img</span><span class=p>(</span>
+</span></span><span class=line><span class=cl>        <span class=n>f</span><span class=p>,</span> <span class=n>grayscale</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>color_mode</span><span class=o>=</span><span class=s2>&#34;rgb&#34;</span><span class=p>,</span> <span class=n>target_size</span><span class=o>=</span><span class=kc>None</span><span class=p>,</span> <span class=n>interpolation</span><span class=o>=</span><span class=s2>&#34;nearest&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>im</span> <span class=o>=</span> <span class=n>tf</span><span class=o>.</span><span class=n>keras</span><span class=o>.</span><span class=n>preprocessing</span><span class=o>.</span><span class=n>image</span><span class=o>.</span><span class=n>img_to_array</span><span class=p>(</span><span class=n>im</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>im</span> <span class=o>=</span> <span class=n>im</span><span class=o>.</span><span class=n>astype</span><span class=p>(</span><span class=s2>&#34;float32&#34;</span><span class=p>)</span> <span class=o>/</span> <span class=mi>255</span>
+</span></span><span class=line><span class=cl>    <span class=n>image_data</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>im</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>image_data</span> <span class=o>=</span> <span class=n>np</span><span class=o>.</span><span class=n>array</span><span class=p>(</span><span class=n>image_data</span><span class=p>,</span> <span class=s2>&#34;float32&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># The network is pretty tiny, as it has to run on a potato.</span>
+</span></span><span class=line><span class=cl><span class=n>model</span> <span class=o>=</span> <span class=n>Sequential</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=n>model</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>Flatten</span><span class=p>(</span><span class=n>input_shape</span><span class=o>=</span><span class=p>(</span><span class=mi>16</span><span class=p>,</span><span class=mi>16</span><span class=p>,</span><span class=mi>3</span><span class=p>)))</span>
+</span></span><span class=line><span class=cl><span class=c1># I&#39;m sure we can compress it all down to four numbers.</span>
+</span></span><span class=line><span class=cl><span class=n>model</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>Dense</span><span class=p>(</span><span class=mi>4</span><span class=p>,</span> <span class=n>activation</span><span class=o>=</span><span class=s1>&#39;relu&#39;</span><span class=p>))</span>
+</span></span><span class=line><span class=cl><span class=n>model</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>Dense</span><span class=p>(</span><span class=mi>128</span><span class=p>,</span> <span class=n>activation</span><span class=o>=</span><span class=s1>&#39;softmax&#39;</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=nb>print</span><span class=p>(</span><span class=s2>&#34;Train this neural network so it can read text!&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>wt</span> <span class=o>=</span> <span class=n>model</span><span class=o>.</span><span class=n>get_weights</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=k>while</span> <span class=kc>True</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;Menu:&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;0. Clear weights&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;1. Set weight&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;2. Read flag&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;3. Quit&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>inp</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=nb>input</span><span class=p>())</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=n>inp</span> <span class=o>==</span> <span class=mi>0</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>        <span class=n>wt</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>fill</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>wt</span><span class=p>[</span><span class=mi>1</span><span class=p>]</span><span class=o>.</span><span class=n>fill</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>wt</span><span class=p>[</span><span class=mi>2</span><span class=p>]</span><span class=o>.</span><span class=n>fill</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>wt</span><span class=p>[</span><span class=mi>3</span><span class=p>]</span><span class=o>.</span><span class=n>fill</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>model</span><span class=o>.</span><span class=n>set_weights</span><span class=p>(</span><span class=n>wt</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>elif</span> <span class=n>inp</span> <span class=o>==</span> <span class=mi>1</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>        <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;Type layer index, weight index(es), and weight value:&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>inp</span> <span class=o>=</span> <span class=nb>input</span><span class=p>()</span><span class=o>.</span><span class=n>split</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>        <span class=n>value</span> <span class=o>=</span> <span class=nb>float</span><span class=p>(</span><span class=n>inp</span><span class=p>[</span><span class=o>-</span><span class=mi>1</span><span class=p>])</span>
+</span></span><span class=line><span class=cl>        <span class=n>idx</span> <span class=o>=</span> <span class=p>[</span><span class=nb>int</span><span class=p>(</span><span class=n>c</span><span class=p>)</span> <span class=k>for</span> <span class=n>c</span> <span class=ow>in</span> <span class=n>inp</span><span class=p>[:</span><span class=o>-</span><span class=mi>1</span><span class=p>]]</span>
+</span></span><span class=line><span class=cl>        <span class=n>wt</span><span class=p>[</span><span class=n>idx</span><span class=p>[</span><span class=mi>0</span><span class=p>]][</span><span class=nb>tuple</span><span class=p>(</span><span class=n>idx</span><span class=p>[</span><span class=mi>1</span><span class=p>:])]</span> <span class=o>=</span> <span class=n>value</span>
+</span></span><span class=line><span class=cl>        <span class=n>model</span><span class=o>.</span><span class=n>set_weights</span><span class=p>(</span><span class=n>wt</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>elif</span> <span class=n>inp</span> <span class=o>==</span> <span class=mi>2</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>        <span class=n>results</span> <span class=o>=</span> <span class=n>model</span><span class=o>.</span><span class=n>predict</span><span class=p>(</span><span class=n>image_data</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>s</span> <span class=o>=</span> <span class=s2>&#34;&#34;</span>
+</span></span><span class=line><span class=cl>        <span class=k>for</span> <span class=n>row</span> <span class=ow>in</span> <span class=n>results</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>            <span class=n>k</span> <span class=o>=</span> <span class=s2>&#34;?&#34;</span>
+</span></span><span class=line><span class=cl>            <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>v</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>row</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>                <span class=k>if</span> <span class=n>v</span> <span class=o>&gt;</span> <span class=mf>0.5</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>                    <span class=n>k</span> <span class=o>=</span> <span class=nb>chr</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>            <span class=n>s</span> <span class=o>+=</span> <span class=n>k</span>
+</span></span><span class=line><span class=cl>        <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;The neural network sees:&#34;</span><span class=p>,</span> <span class=nb>repr</span><span class=p>(</span><span class=n>s</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>        <span class=k>if</span> <span class=n>s</span> <span class=o>==</span> <span class=n>flag</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>            <span class=nb>print</span><span class=p>(</span><span class=s2>&#34;And that is the correct flag!&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>        <span class=k>break</span>
+</span></span></code></pre></div></details><h3 id=solution-attempt-1>Solution Attempt #1</h3><p>One way to solve this challenge would be to train a neural network in a
+supervised setting, by providing labeled examples of handwritten characters to
+the network.</p><p>There are two obstacles that make training the network in such a way difficult:</p><ol><li>The network is extremely small.</li><li>There are only four training examples.</li></ol><p>We cannot do much about the first complication, as the architecture of the
+network is fixed. About the second one – we could try to get more training data
+on our own. For example, we could create our own dataset based on an existing
+character dataset (such as <a href=https://www.nist.gov/itl/products-and-services/emnist-dataset>EMNIST</a>) that manipulates the images to look
+more similar to the four provided examples, e.g., by adding a background color
+to characters.</p><p>I tried training the neural network in the described way. The result was that
+the model underfitted even when using very little training data, hinting that it
+is too small to be used for optical character recognition.</p><h3 id=solution-attempt-2>Solution Attempt #2</h3><p>Considering the discussion from the previous section, it seems like training a
+neural network of such size to classify symbols on images is impractical. But
+what if we optimized the neural network to perform some task other than
+character classification?</p><p>There is, in fact, one simple task that our tiny network is capable of learning
+that helps us solve this challenge. That task is copying over the value from a
+specific position in the image in a specific color channel. To wit, if we
+represent an image as a 768-element array of 8-bit unsigned integers, the model
+can learn to output the value stored at index \( i \).</p><p>Later, it turns out that with some simple rearrangements, we can use one set of
+parameters to copy over the value from any location in the image array, not just
+at some specific index \( i \). This means that if we wanted to copy over all
+768 values, instead of having to train 768 networks, each one focusing on a
+specific index, we would only need to train one.</p><p>If we trained a network to perform the previously described copy-over task, we
+could use it to extract the 34 secret images from the server and decode the flag
+manually, using our biological neural networks 🙂. The rest of this section
+describes the training process for the said task and an algorithm that utilizes
+the network to extract images from the server.</p><p>Let’s see how we can train the neural network to copy the values from its input
+to its output. As there is no difference between copying over values from
+different positions, let’s assume for now that our input consists of only 1
+number.</p><p>The first step is redefining the meaning of the output. Recall that the output
+consists of 128 units and that the server outputs a character whose ASCII code
+was assigned the highest probability. As every element in the image array has a
+value between 0 and 255, we can define a mapping between the ASCII symbols and
+the numbers 0–255 as follows:</p><table><thead><tr><th>ASCII code</th><th>Matching numbers</th></tr></thead><tbody><tr><td>0</td><td>0, 1</td></tr><tr><td>1</td><td>2, 3</td></tr><tr><td>2</td><td>4, 5</td></tr><tr><td>3</td><td>6, 7</td></tr><tr><td>4</td><td>8, 9</td></tr><tr><td>&mldr;</td><td>&mldr;</td></tr><tr><td>127</td><td>254, 255</td></tr></tbody></table><p>For example, if the value at currently focused location is 7, then the network
+should assign a high probability to class 3.</p><p>The second step involves training the model to act according to our new desired
+output function. The training data consists of integers from 0 to 255, and as
+the objective function, we can use cross entropy. The following code snippet
+initializes a model and trains it.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-py data-lang=py><span class=line><span class=cl><span class=kn>import</span> <span class=nn>torch</span>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=nn>torch.nn.functional</span> <span class=k>as</span> <span class=nn>F</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>torch</span><span class=o>.</span><span class=n>manual_seed</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>class</span> <span class=nc>Model</span><span class=p>(</span><span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Module</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>  <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>    <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=bp>self</span><span class=o>.</span><span class=n>linear1</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Linear</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>4</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=bp>self</span><span class=o>.</span><span class=n>linear2</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Linear</span><span class=p>(</span><span class=mi>4</span><span class=p>,</span> <span class=mi>128</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>def</span> <span class=nf>forward</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>x</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>x</span> <span class=o>/</span> <span class=mi>255</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>linear1</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=n>F</span><span class=o>.</span><span class=n>relu</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>x</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>linear2</span><span class=p>(</span><span class=n>x</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>x</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>model</span> <span class=o>=</span> <span class=n>Model</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=n>optimizer</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>optim</span><span class=o>.</span><span class=n>Adam</span><span class=p>(</span><span class=n>model</span><span class=o>.</span><span class=n>parameters</span><span class=p>(),</span> <span class=n>lr</span><span class=o>=</span><span class=mf>0.1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>for</span> <span class=n>i</span> <span class=ow>in</span> <span class=nb>range</span><span class=p>(</span><span class=mi>200</span><span class=p>):</span>
+</span></span><span class=line><span class=cl>    <span class=n>optimizer</span><span class=o>.</span><span class=n>zero_grad</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>inputs</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>arange</span><span class=p>(</span><span class=mi>256</span><span class=p>)</span><span class=o>.</span><span class=n>float</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>targets</span> <span class=o>=</span> <span class=p>(</span><span class=n>inputs</span> <span class=o>/</span> <span class=mi>2</span><span class=p>)</span><span class=o>.</span><span class=n>long</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>logits</span> <span class=o>=</span> <span class=n>model</span><span class=p>(</span><span class=n>inputs</span><span class=o>.</span><span class=n>unsqueeze</span><span class=p>(</span><span class=mi>1</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>    <span class=n>loss</span> <span class=o>=</span> <span class=n>F</span><span class=o>.</span><span class=n>cross_entropy</span><span class=p>(</span><span class=n>logits</span><span class=p>,</span> <span class=n>targets</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>loss</span><span class=o>.</span><span class=n>backward</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>optimizer</span><span class=o>.</span><span class=n>step</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=k>with</span> <span class=n>torch</span><span class=o>.</span><span class=n>no_grad</span><span class=p>():</span>
+</span></span><span class=line><span class=cl>        <span class=n>predictions</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>argmax</span><span class=p>(</span><span class=n>logits</span><span class=p>,</span> <span class=n>dim</span><span class=o>=-</span><span class=mi>1</span><span class=p>)</span> <span class=o>*</span> <span class=mi>2</span>
+</span></span><span class=line><span class=cl>        <span class=n>mae</span> <span class=o>=</span> <span class=n>F</span><span class=o>.</span><span class=n>l1_loss</span><span class=p>(</span><span class=n>predictions</span><span class=o>.</span><span class=n>float</span><span class=p>(),</span> <span class=n>inputs</span><span class=o>.</span><span class=n>float</span><span class=p>())</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=nb>print</span><span class=p>(</span><span class=sa>f</span><span class=s2>&#34;iteration </span><span class=si>{</span><span class=n>i</span><span class=si>}</span><span class=s2>, loss </span><span class=si>{</span><span class=n>loss</span><span class=o>.</span><span class=n>item</span><span class=p>()</span><span class=si>:</span><span class=s2>.3f</span><span class=si>}</span><span class=s2>, mean absolute error </span><span class=si>{</span><span class=n>mae</span><span class=o>.</span><span class=n>item</span><span class=p>()</span><span class=si>:</span><span class=s2>.3f</span><span class=si>}</span><span class=s2>&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>model</span><span class=o>.</span><span class=n>linear2</span><span class=o>.</span><span class=n>weight</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Parameter</span><span class=p>(</span><span class=n>model</span><span class=o>.</span><span class=n>linear2</span><span class=o>.</span><span class=n>weight</span> <span class=o>*</span> <span class=mi>1000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=n>model</span><span class=o>.</span><span class=n>linear2</span><span class=o>.</span><span class=n>bias</span> <span class=o>=</span> <span class=n>torch</span><span class=o>.</span><span class=n>nn</span><span class=o>.</span><span class=n>Parameter</span><span class=p>(</span><span class=n>model</span><span class=o>.</span><span class=n>linear2</span><span class=o>.</span><span class=n>bias</span> <span class=o>*</span> <span class=mi>1000</span><span class=p>)</span>
+</span></span></code></pre></div><p>It should take around two seconds to train the network. It should reach a mean
+absolute error of around 2, which is good enough for our purposes.</p><p>Note that after the training is complete, the parameters of the last layer are
+multiplied by 1000. That step is necessary because the remote server only emits
+the most probable character when its probability is higher than 0.5. However,
+the network often does not give that high a probability, and the bulk of
+probability mass is distributed between several classes.</p><p>To ensure that the neural network gives high confidence to one class, we apply
+softmax temperature of \( \frac{1}{1000} \). Usually, the temperature is
+applied during inference by dividing the logits by the temperature, but we will
+instead encode the temperature in the weights themselves because we cannot alter
+the code that the remote server is running.</p><p>One question I have not yet addressed is why we do not need to train a separate
+network for every index in the image array?</p><p>We currently trained a network with an input size of 1, leading to a 1x4 weights
+vector \( \boldsymbol{w}&rsquo; \) in the first layer. If we later want to use the
+same network for an input size of 768, we initialize the weight matrix \(
+\boldsymbol{W} \) of size 768x4 to a zero matrix. To make the network focus on
+index \( i \), we set the values in the i’th row in the matrix to vector \(
+\boldsymbol{w}&rsquo; \). Then, the rest of the values besides the one at \( i \)
+do not contribute to the layer’s output, as they are all multiplied by zeros.
+But the value of the element at index \( i \) is still multiplied by the same
+coefficients as in the case where the model only had one input.</p><img src=copying_index_i.png alt class=figure><p>Once the network has been trained, the next step is using it to extract images
+from the server. I will outline the general algorithm for extracting the images.
+But before we get to the algorithm, I will give a brief overview of the commands
+used for interacting with the server, as these commands are referenced in the
+algorithm.</p><p><strong>The commands</strong></p><ol><li>Set all parameters to 0.</li><li>Set the value of a single parameter to \( x \) at index \( i \) in
+parameter tensor \( j \in \{0, 1, 2, 3\} \). \( j \) specifies which
+parameter tensor should be changed. There are four tensors in total: 1 –
+weights for layer 1, 2 – biases for layer 1, 3 – weights for layer 2, 4 –
+biases for layer 2.</li><li>Read the flag. The server responds with a string, containing predictions for
+all 34 images.</li></ol><p><strong>Image extraction algorithm</strong></p><ul><li>Initialize a 34x768 matrix \( \boldsymbol{o} \) to store the (partially)
+extracted images from the server.</li><li>Set all parameters to 0 using command 1.</li><li>Using command 2, copy all parameters from the trained network except the
+weights matrix from the first layer.</li><li>for \( i = 0 \: \textrm{to} \: 767 \)<ul><li>Using command 2, set the weights in the first layer at indices \( (i, 0),
+(i, 1), (i, 2), (i, 3) \) to the values of the weights of the trained
+network’s first layer.</li><li>Read the flag, convert the returned symbols to their ASCII codes, and
+multiply the resulting numbers by two. Set column \( i \) in matrix \(
+\boldsymbol{o} \) to the obtained numbers.</li><li>Using command 2, set the weights in the first layer at indices \( (i, 0),
+(i, 1), (i, 2), (i, 3) \) to 0.</li></ul></li><li>Convert each of the rows in matrix \( \boldsymbol{o} \) to 16x16x3 RGB
+images using a library of your choice.</li><li>Save the images to disk.</li><li>Decode the flag from the images.</li></ul><p>The images extracted from the server should look as follows:</p><p><img src=flag/0.png alt=C>
+<img src=flag/1.png alt=T>
+<img src=flag/2.png alt=F>
+<img src=flag/3.png alt={>
+<img src=flag/4.png alt=n>
+<img src=flag/5.png alt=0>
+<img src=flag/6.png alt=_>
+<img src=flag/7.png alt=l>
+<img src=flag/8.png alt=3>
+<img src=flag/9.png alt=a>
+<img src=flag/10.png alt=k>
+<img src=flag/11.png alt=y>
+<img src=flag/12.png alt=_>
+<img src=flag/13.png alt=R>
+<img src=flag/14.png alt=e>
+<img src=flag/15.png alt=L>
+<img src=flag/16.png alt=U>
+<img src=flag/17.png alt=_>
+<img src=flag/18.png alt=y>
+<img src=flag/19.png alt=3>
+<img src=flag/20.png alt=t>
+<img src=flag/21.png alt=_>
+<img src=flag/22.png alt=5>
+<img src=flag/23.png alt=t>
+<img src=flag/24.png alt=i>
+<img src=flag/25.png alt=l>
+<img src=flag/26.png alt=l>
+<img src=flag/27.png alt=_>
+<img src=flag/28.png alt=l>
+<img src=flag/29.png alt=e>
+<img src=flag/30.png alt=4>
+<img src=flag/31.png alt=k>
+<img src=flag/32.png alt=y>
+<img src=flag/33.png alt=}></p><p>From the images we can see that the flag is
+<strong>CTF{n0_l3aky_ReLU_y3t_5till_le4ky}</strong>.</p><h3 id=alternative-solution>Alternative Solution</h3><p>The solution I introduced in the previous section was the one I came up with
+during the competition. After the competition, I found some
+<a href=https://sigflag.at/blog/2022/google_ctf_2022_ocr/>write-ups</a> for the same challenge that used slightly different
+approaches. While the core idea stayed the same – extracting the images from the
+server and decoding the flag manually, there were several ways to extract the
+images.</p><p>One alternative was to determine the values using binary search. Let’s denote
+the neural network as follows:</p><p>\[ f(\boldsymbol{x}) = \textrm{softmax}(\textrm{ReLU}(\boldsymbol{x} \cdot
+\boldsymbol{W} + \boldsymbol{b}) \cdot \boldsymbol{V} + \boldsymbol{c}) \]</p><p>Here, \( \boldsymbol{W} \), \( \boldsymbol{b} \), \( \boldsymbol{V} \),
+and \( \boldsymbol{c} \) are parameters of the network.</p><p>Let’s denote the index of the array that we are focusing on as \( i \).</p><p>To perform binary search, we initialize the parameters as follows:</p><ul><li>Let \( \boldsymbol{W} \) be zero matrix with the exception that \( w_{i1}
+= 255 \).</li><li>Let \( \boldsymbol{b} \) be a zero vector.</li><li>Let \( \boldsymbol{V} \) be a zero matrix with the exception that \(
+v_{11} = 10 \).</li><li>Let \( \boldsymbol{c} \) be a zero vector.</li></ul><p>The weight \( w_{i1} \) is set to 255 because before the image is fed to the
+model, it is divided by 255. We reverse that operation by multiplying the input
+with 255.</p><p>The binary search algorithm works as follows:</p><ul><li><p>Initially, we know that the value at \( i \) is in the range [0, 255].
+Let’s set \( b_1 = -128 \) and read the flag. The output of the neural
+network before softmax is applied will be all zeros except at \( y_1 \)
+where it will be</p><p>\[ y_1 =
+\textrm{ReLU}(x_i \cdot w_{i1} + b_1) \cdot v_{11} + c_1 =
+\textrm{ReLU}(x_i \cdot 255 - 128) \cdot 10
+\]</p><p>Note that if the value at \( i \) is larger than 128, the neural network
+will assign a positive value the first class. This means that the server would
+return a zero-byte, as applying softmax would shift most of the probability
+mass towards the first class.</p><p>If the value at \( i\) is less than 128, then \( y_1 = 0 \). It follows
+that the input to softmax would then only consist of zeros which leads to an
+uniform distribution after applying softmax and the server would return a ?
+symbol, as none of the classes would have had a probability higher than 0.5.
+Based on the returned value from the server, we can induce whether the value
+is in the half-interval [0, 128) or the interval [128, 255].</p></li></ul><ul><li><p>We have now performed the first iteration of binary search and have shrunk the
+size of the set of potential values by a factor of 2.</p><p>We can perform another interation to get a more accurate reading. If during
+the previous step the value was found to be in [0, 128), we can set \( b_1 =
+-64 \) to determine if the value is in [0, 64) or [64, 128). If during
+previous step we found that the value was in [128, 255], then we can set \(
+b_1 = -128 - 64 = -192 \) to determine if the value is in [128, 192) or
+[192, 255].</p></li><li><p>We could continue the search for a few more steps, but it turns out that just
+two steps of binary search gives us high enough accuracy to decode the flag
+from the images.</p></li></ul><p>Here are the same 34 images from the server when decoded using the binary search
+approach.</p><p><img src=flag-binary-search/0.png alt=C>
+<img src=flag-binary-search/1.png alt=T>
+<img src=flag-binary-search/2.png alt=F>
+<img src=flag-binary-search/3.png alt={>
+<img src=flag-binary-search/4.png alt=n>
+<img src=flag-binary-search/5.png alt=0>
+<img src=flag-binary-search/6.png alt=_>
+<img src=flag-binary-search/7.png alt=l>
+<img src=flag-binary-search/8.png alt=3>
+<img src=flag-binary-search/9.png alt=a>
+<img src=flag-binary-search/10.png alt=k>
+<img src=flag-binary-search/11.png alt=y>
+<img src=flag-binary-search/12.png alt=_>
+<img src=flag-binary-search/13.png alt=R>
+<img src=flag-binary-search/14.png alt=e>
+<img src=flag-binary-search/15.png alt=L>
+<img src=flag-binary-search/16.png alt=U>
+<img src=flag-binary-search/17.png alt=_>
+<img src=flag-binary-search/18.png alt=y>
+<img src=flag-binary-search/19.png alt=3>
+<img src=flag-binary-search/20.png alt=t>
+<img src=flag-binary-search/21.png alt=_>
+<img src=flag-binary-search/22.png alt=5>
+<img src=flag-binary-search/23.png alt=t>
+<img src=flag-binary-search/24.png alt=i>
+<img src=flag-binary-search/25.png alt=l>
+<img src=flag-binary-search/26.png alt=l>
+<img src=flag-binary-search/27.png alt=_>
+<img src=flag-binary-search/28.png alt=l>
+<img src=flag-binary-search/29.png alt=e>
+<img src=flag-binary-search/30.png alt=4>
+<img src=flag-binary-search/31.png alt=k>
+<img src=flag-binary-search/32.png alt=y>
+<img src=flag-binary-search/33.png alt=}></p></div></div></body></html>
